@@ -710,6 +710,11 @@ var mriview = (function(module) {
                 this.surf.removeEventListener(name, this._listeners[name]);
             this.ui.remove(this.surf.ui);
         }
+        console.log('Marcus is here')
+        console.log(dataview)
+        console.log(dataview.data[0])
+        console.log(dataview.data[0].subject)
+
         var subj = dataview.data[0].subject;
         this.surf = subjects[subj];
         this.surf.init(dataview);

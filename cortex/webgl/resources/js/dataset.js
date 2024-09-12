@@ -225,6 +225,12 @@ var dataset = (function(module) {
                 merge[name] = this.uniforms[name];
             for (var name in uniforms)
                 merge[name] = uniforms[name];
+            console.log('Dataset.js getshader...')
+            console.log(this.data[i])
+            console.log('colormap: ' + merge.colormap)
+            console.log('vmin: ' + merge.vmin)
+            console.log('vmax: ' + merge.vmax)
+            console.log('uniforms: ' + merge.uniforms)
 
             opts.sampler = module.samplers[this.filter];
             opts.rgb = this.data[0].raw;
@@ -268,6 +274,7 @@ var dataset = (function(module) {
         this.filter = interp;
         for (var i = 0; i < this.data.length; i++)
             this.data[i].setFilter(interp);
+
         //force a shader update for all surfaces using this dataview
         // this.dispatchEvent({type:"update", dataview:this});
     };

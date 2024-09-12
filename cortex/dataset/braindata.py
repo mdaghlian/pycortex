@@ -46,8 +46,11 @@ class BrainData(object):
     def name(self):
         """Name of this BrainData, computed from hash of data.
         TODO:WHAT IS THIS USEFUL FOR
+        MARCUS FIX THIS? STOP OVERWRITING... MEDIT
+        Use it based on the description - which will be generated randomly...
         """
-        return "__%s"%_hash(self.data)[:16]
+        # return "__%s"%_hash(self.data)[:16]
+        return "__%s"%_hash(self.unique_id)[:16]
 
     def exp(self):
         """Return copy of this brain data with data exponentiated.
@@ -60,7 +63,8 @@ class BrainData(object):
         yield self
 
     def __hash__(self):
-        return hash(_hash(self.data))
+        # return hash(_hash(self.data))
+        return hash(_hash(self.unique_id))
 
     def _write_hdf(self, h5, name=None):
         if name is None:

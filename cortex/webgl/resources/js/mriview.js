@@ -401,9 +401,15 @@ var mriview = (function(module) {
         }
 
         var viewer = this
+        
+        console.log('Helooooooo')
+        console.log('viewer.active: ', viewer.active)
+        console.log('viewer.active.cmapName: ', viewer.active.cmapName)
+        
+        
 
         let imageData = $('#' + this.active.cmapName + ' img')[0].src
-
+        console.log('imageData: ', imageData)
         $('#colorlegend-colorbar').attr('src', imageData);
         $('.colorlegend-select').val(this.active.cmapName).trigger('change');
 
@@ -552,6 +558,8 @@ var mriview = (function(module) {
 
         var defers = [];
         for (var i = 0; i < this.active.data.length; i++) {
+            console.log(i)
+            console.log(this.active.name)
             defers.push(subjects[this.active.data[i].subject].loaded)
         }
         $.when.apply(null, defers).done(function() {
@@ -572,7 +580,9 @@ var mriview = (function(module) {
                 else
                     $(this).removeClass("ui-selected");
             })
-
+            console.log('Marcus here ' + this.active)
+            console.log(this.active.data.length)
+            console.log(this.active.data.raw)
             $(this.object).find("#datasets").val(name);
             if (typeof(this.active.description) == "string") {
                 var html = name+"<div class='datadesc'>"+this.active.description+"</div>";

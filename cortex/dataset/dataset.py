@@ -112,14 +112,23 @@ class Dataset(object):
 
         return ds
         
+    # def uniques(self, collapse=False):
+    #     """Return the set of unique BrainData objects contained by this dataset"""
+    #     uniques = set()
+    #     for name, view in self:
+    #         for sv in view.uniques(collapse=collapse):
+    #             uniques.add(sv)
+
+    #     return uniques
+    # FIX (maybe comes with other issues?)
     def uniques(self, collapse=False):
         """Return the set of unique BrainData objects contained by this dataset"""
-        uniques = set()
+        uniques_dict = {}
         for name, view in self:
             for sv in view.uniques(collapse=collapse):
-                uniques.add(sv)
-
-        return uniques
+                
+                uniques_dict[sv.name] = sv  # Assuming 'name' is a unique identifier        
+        return set(uniques_dict.values())      
 
     def save(self, filename=None, pack=False):
         if filename is not None:

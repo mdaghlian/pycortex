@@ -381,6 +381,27 @@ class Overlay(object):
             xml.write(etree.tostring(svg, pretty_print=True)) # python2.X
             #except:
             #    xml.write(etree.tostring(svg, encoding=str, pretty_print=True)) # python3.X
+    
+    def add_roi(self, name, d_path, **kwargs):
+        """Adds projected data for defining a new ROI to the saved overlays.svg file in a new layer"""
+        svg = etree.parse(self.svgobject.svgfile, parser=parser)
+        imglayer = _find_layer(svg, "rois")
+        if True:
+            layer = _find_layer(svg, self.name)
+            _make_layer(_find_layer(layer, "shapes"), name)
+
+        layer = _make_layer(imglayer, name)
+        layer.append(E.path(
+            d=d_path, 
+            id=name, 
+            style="fill:none;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+            ))
+
+        with open(self.svgobject.svgfile, "wb") as xml:
+            #try:
+            xml.write(etree.tostring(svg, pretty_print=True)) # python2.X
+            #except:
+            #    xml.write(etree.tostring(svg, encoding=str, pretty_print=True)) # python3.X
 
 class Labels(object):
     def __init__(self, overlay):

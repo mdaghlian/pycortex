@@ -143,7 +143,6 @@ def make_figure(braindata, recache=False, pixelwise=True, thick=32, sampler='nea
     # Add data
     data_im, extents = composite.add_data(ax, dataview, pixelwise=pixelwise, thick=thick, sampler=sampler,
                                           height=height, depth=depth, recache=recache, nanmean=nanmean)
-
     layers = dict(data=data_im)
     # Add curvature
     if with_curvature:

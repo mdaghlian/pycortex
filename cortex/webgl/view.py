@@ -7,8 +7,10 @@ import mimetypes
 import os
 import random
 import shutil
+import sys
 import threading
 import time
+from typing import Union, Any, Callable, Optional, ParamSpec, cast
 import warnings
 import webbrowser
 from configparser import NoOptionError
@@ -282,24 +284,25 @@ def make_static(
 
 
 def show(
-    data,
-    autoclose=None,
-    open_browser=None,
-    port=None,
-    pickerfun=None,
-    recache=False,
-    template="mixer.html",
-    overlays_available=None,
-    overlays_visible=("rois", "sulci"),
-    labels_visible=("rois",),
-    types=("inflated",),
-    overlay_file=None,
-    curvature_brightness=None,
-    curvature_contrast=None,
-    curvature_smoothness=None,
-    surface_specularity=None,
-    title="Brain",
-    layout=None,
+    data: Union[dataset.Dataset, dataset.Dataview],
+    autoclose: Optional[bool]=None,
+    open_browser: Optional[bool]=None,
+    port: Optional[int]=None,
+    pickerfun: Optional[Callable[[tuple[int, int, int], int, str], None]]=None,
+    recache: bool=False,
+    template: str="mixer.html",
+    overlays_available: Optional[tuple[str, ...]]=None,
+    overlays_visible: Optional[tuple[str, ...]]=("rois", "sulci"),
+    labels_visible: Optional[tuple[str, ...]]=("rois",),
+    types: Optional[tuple[str, ...]]=("inflated",),
+    overlay_file: Optional[str]=None,
+    curvature_brightness: Optional[float]=None,
+    curvature_contrast: Optional[float]=None,
+    curvature_smoothness: Optional[float]=None,
+    surface_specularity: Optional[float]=None,
+    title: str="Brain",
+    layout: Optional[str]=None,
+    display_url: bool=True,
     **kwargs,
 ):
     """
@@ -323,10 +326,11 @@ def show(
         The port that will be used by the server. If None, a random port will be
         selected from the range 1024-65536. Default None
     pickerfun : function or None, optional
-        Should be a function that takes two arguments, a voxel index and a vertex
-        index. Is called whenever a location on the surface is clicked in the
-        viewer. This can be used to print information about individual voxels or
-        vertices, plot receptive fields, or many other uses. Default None
+        Should be a function that takes three arguments, a 3-D voxel vector, a
+        vertex index, and the hemisphere ("left" or "right"). Is called whenever
+        a location on the surface is clicked in the viewer. This can be used to
+        print information about individual voxels or vertices, plot receptive
+        fields, or many other uses. Default None
     recache : bool, optional
         Force recreation of CTM and SVG files for surfaces. Default False
     template : string, optional
@@ -372,6 +376,11 @@ def show(
         The layout of the viewer subwindows for showing multiple subjects, passed to
         the template generator.
         Default None, corresponding to no subwindows.
+    display_url : bool, optional
+        If True and ``open_browser=False``, display an IPython widget with a URL
+        link to access the viewer. Set to False to suppress this display message,
+        which can be useful in contexts like Marimo notebooks or programmatic
+        headless viewers. Default True
     **kwargs
         All additional keyword arguments are passed to the template renderer.
     """
@@ -390,7 +399,7 @@ def show(
     db.auxfile = data
 
     #Extract the list of stimuli, for special-casing
-    stims = dict()
+    stims: dict[str, str] = dict()
     for name, view in data:
         if 'stim' in view.attrs and os.path.exists(view.attrs['stim']):
             sname = os.path.split(view.attrs['stim'])[1]
@@ -418,10 +427,10 @@ def show(
         smootherstep=(lambda x, y, m: linear(x, y, 6*m**5 - 15*m**4 + 10*m**3))
     )
 
-    post_name = Queue()
+    post_name: Queue[str] = Queue()
 
     # Put together all view options
-    my_viewopts = dict(options.config.items('webgl_viewopts'))
+    my_viewopts: dict[str, Any] = dict(options.config.items('webgl_viewopts'))
     my_viewopts['overlays_visible'] = overlays_visible
     my_viewopts['labels_visible'] = labels_visible
     my_viewopts["brightness"] = (
@@ -450,10 +459,10 @@ def show(
             my_viewopts[sec] = dict(options.config.items(sec))
 
     if pickerfun is None:
-        pickerfun = lambda a, b: None
+        pickerfun = lambda *a: None
 
     class CTMHandler(web.RequestHandler):
-        def get(self, path):
+        def get(self, path: str):
             subj, path = path.split('/')
             if path == '':
                 self.set_header("Content-Type", "application/json")
@@ -467,8 +476,9 @@ def show(
                 self.write(open(os.path.join(fpath, path), 'rb').read())
 
     class DataHandler(web.RequestHandler):
-        def get(self, path):
+        def get(self, path: str):
             path = path.strip("/")
+            frame: Union[int, str]
             try:
                 dataname, frame = path.split('/')
             except ValueError:
@@ -501,7 +511,7 @@ def show(
         def initialize(self):
             pass
 
-        def get(self, path):
+        def get(self, path: str):
             if path not in stims:
                 self.set_status(404)
                 self.write_error(404)
@@ -544,9 +554,11 @@ def show(
                         data = png
                 svgfile.write(data)
 
-    class JSMixer(serve.JSProxy):
+    P = ParamSpec('P')
+
+    class JSMixer(serve.JSProxy[P]):
         @property
-        def view_props(self):
+        def view_props(self) -> list[str]:
             """An enumerated list of settable properties for views. 
             There may be a way to get this from the javascript object, 
             but I (ML) don't know how.
@@ -578,8 +590,9 @@ def show(
 
             """
             # Set unfolding level first, as it interacts with other arguments
-            surface = getattr(self.ui, "surface")
-            subject_list = surface._folders.attrs.keys()
+            assert isinstance(self.ui, serve.JSProxy)
+            surface: serve.JSProxy[P] = getattr(self.ui, "surface")
+            subject_list = cast(serve.JSProxy[P], surface._folders).attrs.keys()
             # Better to only self.view_props once; it interacts with javascript, 
             # don't want to do that too often, it leads to glitches.
             vw_props = copy.copy(self.view_props)
@@ -675,7 +688,7 @@ def show(
             images.update(new_ims)
             return Proxy(metadata)
 
-        def getImage(self, filename, size=(1920, 1080)):
+        def getImage(self, filename: str, size: tuple[int, int]=(1920, 1080)):
             """Saves currently displayed view to a .png image file
 
             Parameters
@@ -886,7 +899,25 @@ def show(
 
     class PickerHandler(web.RequestHandler):
         def get(self):
-            pickerfun(int(self.get_argument("voxel")), int(self.get_argument("vertex")))
+            voxel_arg = self.get_argument("voxel", None)
+            if voxel_arg is None:
+                self.set_status(400)
+                self.finish("Missing 'voxel' query parameter")
+                return
+            parts = voxel_arg.split(",")
+            if len(parts) != 3:
+                self.set_status(400)
+                self.finish("Invalid 'voxel' query parameter: expected 3 comma-separated integers")
+                return
+            try:
+                voxel: tuple[int, int, int] = tuple(int(i) for i in parts)
+                vertex: int = int(self.get_argument("vertex"))
+            except (TypeError, ValueError):
+                self.set_status(400)
+                self.finish("Invalid 'voxel' or 'vertex' query parameter")
+                return
+            hemi: str = self.get_argument("hemi")
+            pickerfun(voxel, vertex, hemi)
 
     class WebApp(serve.WebApp):
         disconnect_on_close = autoclose
@@ -918,10 +949,11 @@ def show(
         client = server.get_client()
         client.server = server
         return client
-    else:
+    elif display_url:
         try:
             from IPython.display import HTML, display
             display(HTML('Open viewer: <a href="{0}" target="_blank">{0}</a>'.format(url)))
         except:
             pass
+
     return server

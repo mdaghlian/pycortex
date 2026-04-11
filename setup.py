@@ -4,10 +4,7 @@ import os
 from glob import glob
 import numpy
 
-try:
-    import configparser
-except ImportError:
-    import ConfigParser as configparser
+import configparser
 
 from setuptools import setup, Extension
 from setuptools.command.install import install
@@ -51,20 +48,7 @@ data_files = [
 ]
 
 
-# Modified from DataLad codebase to load version from pycortex/version.py
-def get_version():
-    """Load version from version.py without entailing any imports
-    Parameters
-    ----------
-    name: str
-      Name of the folder (package) where from to read version.py
-    """
-    # This might entail lots of imports which might not yet be available
-    # so let's do ad-hoc parsing of the version.py
-    with open(os.path.abspath('cortex/version.py')) as f:
-        version_lines = list(filter(lambda x: x.startswith('__version__'), f))
-    assert (len(version_lines) == 1)
-    return version_lines[0].split('=')[1].strip(" '\"\t\n")
+
 
 
 ctm = Extension('cortex.openctm', [
@@ -85,6 +69,7 @@ ctm = Extension('cortex.openctm', [
             define_macros=[
                 ('LZMA_PREFIX_CTM', None),
                 ('OPENCTM_BUILD', None),
+                ('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION'),
                 #('__DEBUG_', None),
             ]
         )
@@ -92,8 +77,7 @@ formats = Extension('cortex.formats', ['cortex/formats.pyx'],
                     include_dirs=[numpy.get_include()])
 
 DISTNAME = 'pycortex'
-# VERSION needs to be modified under cortex/version.py
-VERSION = get_version()
+# VERSION is now automatically derived from git tags via setuptools-scm
 DESCRIPTION = 'Python Cortical mapping software for fMRI data'
 with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
@@ -103,11 +87,14 @@ LICENSE = '2-clause BSD license'
 URL = 'http://gallantlab.github.io/pycortex'
 DOWNLOAD_URL = URL
 with open('requirements.txt') as f:
-    INSTALL_REQUIRES = f.read().split()
+    INSTALL_REQUIRES = [
+        line.strip()
+        for line in f
+        if line.strip() and not line.lstrip().startswith('#')
+    ]
 
 
 setup(name=DISTNAME,
-      version=VERSION,
       description=DESCRIPTION,
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -149,6 +136,7 @@ setup(name=DISTNAME,
             },
       setup_requires=['Cython', 'numpy'],
       install_requires=INSTALL_REQUIRES,
+      # Don't use `extras_require` here. Put them in pyproject.toml .
       cmdclass=dict(install=my_install),
       include_package_data=True,
       classifiers=[

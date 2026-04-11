@@ -283,6 +283,9 @@ def import_flat(fs_subject, patch, hemis=['lh', 'rh'], cx_subject=None,
         List of hemispheres to import. Defaults to both hemispheres.
     cx_subject : str
         Pycortex subject name
+    flat_type : str
+        Type of flatmap to import. Defaults to 'freesurfer'.
+        Can be 'freesurfer', 'slim', or 'blender'.
     freesurfer_subject_dir : str
         directory for freesurfer subjects. None defaults to environment variable
         $SUBJECTS_DIR
@@ -308,15 +311,19 @@ def import_flat(fs_subject, patch, hemis=['lh', 'rh'], cx_subject=None,
 
     from . import formats
     for hemi in hemis:
-        if flat_type == 'freesurfer':
-            pts, polys, _ = get_surf(fs_subject, hemi, "patch", patch+".flat", freesurfer_subject_dir=freesurfer_subject_dir)
-            # Reorder axes: X, Y, Z instead of Y, X, Z
-            flat = pts[:, [1, 0, 2]]
-            # Flip Y axis upside down
-            flat[:, 1] = -flat[:, 1]
+        if flat_type in ['freesurfer', 'blender']:
+            surf_path = (patch + ".flat") if (flat_type == 'freesurfer') else (patch + ".flat.blender")
+            pts, polys, _ = get_surf(fs_subject, hemi, "patch", surf_path, freesurfer_subject_dir=freesurfer_subject_dir)
+
+            if flat_type == 'freesurfer':
+                # Reorder axes: X, Y, Z instead of Y, X, Z
+                flat = pts[:, [1, 0, 2]]
+                # Flip Y axis upside down
+                flat[:, 1] = -flat[:, 1]
+            else:
+                flat = pts
         elif flat_type == 'slim':
-            flat_file = get_paths(fs_subject, hemi, type='slim',
-                                  freesurfer_subject_dir=freesurfer_subject_dir)
+            flat_file = get_paths(fs_subject, hemi, type='slim', freesurfer_subject_dir=freesurfer_subject_dir)
             flat_file = flat_file.format(name=patch + ".flat")
             flat, polys = formats.read_obj(flat_file)
 
@@ -409,8 +416,8 @@ def parse_surf(filename):
         fp.readline()
         print(comment)
         verts, faces = struct.unpack('>2I', fp.read(8))
-        pts = np.fromstring(fp.read(4*3*verts), dtype='f4').byteswap()
-        polys = np.fromstring(fp.read(4*3*faces), dtype='i4').byteswap()
+        pts = np.frombuffer(fp.read(4*3*verts), dtype='f4').byteswap()
+        polys = np.frombuffer(fp.read(4*3*faces), dtype='i4').byteswap()
 
         return pts.reshape(-1, 3), polys.reshape(-1, 3)
 
@@ -422,8 +429,8 @@ def write_surf(filename, pts, polys, comment=''):
         fp.write(b'\xff\xff\xfe')
         fp.write((comment+'\n\n').encode())
         fp.write(struct.pack('>2I', len(pts), len(polys)))
-        fp.write(pts.astype(np.float32).byteswap().tostring())
-        fp.write(polys.astype(np.uint32).byteswap().tostring())
+        fp.write(pts.astype(np.float32).byteswap().tobytes())
+        fp.write(polys.astype(np.uint32).byteswap().tobytes())
         fp.write(b'\n')
 
 
@@ -463,7 +470,7 @@ def parse_curv(filename):
     """
     with open(filename, 'rb') as fp:
         fp.seek(15)
-        return np.fromstring(fp.read(), dtype='>f4').byteswap().newbyteorder()
+        return np.frombuffer(fp.read(), dtype='>f4').byteswap().view(np.dtype('>f4').newbyteorder('='))
 
 
 def parse_patch(filename):
@@ -472,7 +479,7 @@ def parse_patch(filename):
     with open(filename, 'rb') as fp:
         header, = struct.unpack('>i', fp.read(4))
         nverts, = struct.unpack('>i', fp.read(4))
-        data = np.fromstring(fp.read(), dtype=[('vert', '>i4'), ('x', '>f4'),
+        data = np.frombuffer(fp.read(), dtype=[('vert', '>i4'), ('x', '>f4'),
                                                ('y', '>f4'), ('z', '>f4')])
         assert len(data) == nverts
         return data
@@ -961,7 +968,7 @@ def write_decimated(path, pts, polys):
     with open(path+'.full.patch.3d', 'w') as fp:
         fp.write(struct.pack('>i', -1))
         fp.write(struct.pack('>i', len(dpts)))
-        fp.write(data.tostring())
+        fp.write(data.tobytes())
 
 
 class SpringLayout(object):

@@ -13,20 +13,20 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9, "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
       max-parallel: 5
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
 
-    - uses: actions/cache@v4
+    - uses: actions/cache@v5
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py', '**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -35,14 +35,14 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y inkscape
         pip install --upgrade pip
-        pip install setuptools build wheel numpy "cython<3.0"
+        pip install setuptools build wheel numpy cython
 
     - name: Create the wheel
       run: python setup.py bdist_wheel
 
     - name: Install from the wheel
       run: |
-        pip install $(ls dist/*.whl) --no-build-isolation
+        pip install "$(ls dist/*.whl)[headless]" --no-build-isolation
 
     - name: Test installation of the filestore
       run: |

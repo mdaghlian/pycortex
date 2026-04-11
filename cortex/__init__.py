@@ -6,7 +6,7 @@ from cortex.database import db
 from cortex.utils import *
 from cortex.quickflat import make_figure as quickshow
 from cortex.volume import mosaic, unmask
-import cortex.export
+from cortex import export
 from cortex.version import __version__, __full_version__
 
 try:
@@ -41,7 +41,7 @@ class dep(object):
 surfs = dep()
 
 import sys
-if sys.version_info.major == 2:
+if sys.version_info < (3,):
     stdout = sys.stdout
     reload(sys)
     sys.setdefaultencoding('utf8')

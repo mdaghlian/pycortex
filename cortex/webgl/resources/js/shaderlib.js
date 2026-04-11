@@ -379,6 +379,7 @@ var Shaderlib = (function() {
             "varying float vCurv;",
             "varying float vMedial;",
             "varying float vThickmix;",
+            "varying vec3 vWorldPosition;",
             // "varying float vDrop;",
 
             "varying vec3 vPos_x[2];",
@@ -444,6 +445,7 @@ var Shaderlib = (function() {
 
                 "gl_Position = projectionMatrix * modelViewMatrix * vec4( pos, 1.0 );",
 
+                "vWorldPosition = pos;",
             "}"
             ].join("\n");
 
@@ -477,6 +479,18 @@ var Shaderlib = (function() {
             "uniform vec2 dshape[2];",
             "uniform sampler2D data[4];",
 
+            "uniform vec3 slicexn;", // normal vector for the x sliceplane
+            "uniform vec3 sliceyn;",
+            "uniform vec3 slicezn;",
+
+            "uniform vec3 slicexc;", // centerpoint of the x sliceplane
+            "uniform vec3 sliceyc;",
+            "uniform vec3 slicezc;",
+
+            "uniform bool doslicex;", // should we clip the surface on one side of the x sliceplane?
+            "uniform bool doslicey;",
+            "uniform bool doslicez;",
+
             // "uniform float hatchAlpha;",
             // "uniform vec3 hatchColor;",
             // "uniform sampler2D hatch;",
@@ -489,6 +503,7 @@ var Shaderlib = (function() {
             "varying float vCurv;",
             "varying float vMedial;",
             "varying float vThickmix;",
+            "varying vec3 vWorldPosition;", // the x,y,z coordinates of this pixel
             
             utils.standard_frag_vars,
             utils.rand,
@@ -498,9 +513,23 @@ var Shaderlib = (function() {
             utils.samplers,
 
             "void main() {",
+                //Sliceplane Clipping
+                "bool clipx = dot(vWorldPosition - slicexc, slicexn) > 0.0;", // is this pixel on the wrong side of the x sliceplane?
+                "bool clipy = dot(vWorldPosition - sliceyc, sliceyn) > 0.0;",
+                "bool clipz = dot(vWorldPosition - slicezc, slicezn) > 0.0;",
+
+                "if (clipx && doslicex && !doslicey && !doslicez) discard;", // clip only in x
+                "if (clipy && !doslicex && doslicey && !doslicez) discard;", // clip only in y
+                "if (clipz && !doslicex && !doslicey && doslicez) discard;", // clip only in z
+                "if (clipx && clipy && doslicex && doslicey && !doslicez) discard;", // clip in x and y
+                "if (clipx && clipz && doslicex && !doslicey && doslicez) discard;", // clip in x and z
+                "if (clipy && clipz && !doslicex && doslicey && doslicez) discard;", // clip in y and z
+                "if (clipx && clipy && clipz && doslicex && doslicey && doslicez) discard;", // clip in x, y, and z
+
                 //Curvature Underlay
                 "float ctmp = clamp(vCurv / smoothness, -0.5, 0.5);", // use limits here too
                 "float curv = clamp(ctmp * contrast + brightness, 0.0, 1.0);",
+                
                 "vec4 cColor = vec4(vec3(curv), 1.0);", 
 
                 "vec3 coord_x, coord_y;",
@@ -689,6 +718,7 @@ var Shaderlib = (function() {
             "attribute float data1;",
             "attribute float data2;",
             "attribute float data3;",
+            "attribute float nanmask;",
     "#endif",
 
             "attribute vec4 wm;",
@@ -723,6 +753,9 @@ var Shaderlib = (function() {
                 "cuv.y = (mix(data2, data3, framemix) - vmin[1]) / (vmax[1] - vmin[1]);",
             "#endif",
                 "vColor = texture2D(colormap, cuv);",
+                // NaN mask: WebGL drivers sanitize NaN in vertex attributes,
+                // so we detect NaN in JavaScript and pass a mask (0=NaN, 1=valid).
+                "if (nanmask < 0.5) vColor = vec4(0.);",
         "#endif",
 
         "#ifdef CORTSHEET",
@@ -836,6 +869,9 @@ var Shaderlib = (function() {
 
             for (var i = 0; i < 4; i++)
                 attributes['data'+i] = {type:opts.rgb ? 'v4':'f', value:null};
+
+            if (!opts.rgb)
+                attributes['nanmask'] = {type:'f', value:null};
 
             for (var i = 0; i < morphs-1; i++) {
                 attributes['mixSurfs'+i] = { type:'v4', value:null };

@@ -68,7 +68,7 @@ def read_stl(filename):
         if header[:5] == "solid":
             raise TypeError("Cannot read ASCII STL files")
         npolys, = struct.unpack('I', fp.read(4))
-        data = np.fromstring(fp.read(), dtype=dtype)
+        data = np.frombuffer(fp.read(), dtype=dtype)
         if npolys != len(data):
             raise ValueError('File invalid')
 
@@ -184,7 +184,7 @@ def write_stl(filename, object pts, object polys):
     data['f1'] = pts[polys].reshape(-1, 9)
     with open(filename, 'wb') as fp:
         fp.write(struct.pack('80xI', len(polys)))
-        fp.write(data.tostring())
+        fp.write(data.tobytes())
 
 
 
